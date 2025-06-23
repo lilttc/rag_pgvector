@@ -5,8 +5,10 @@ from rag_pipeline.embedder import Embedder
 from rag_pipeline.vectordb import VectorDB
 from rag_pipeline.prompts import get_rent_law_prompt
 from rag_pipeline.chain import RentLawQAChain
+from dotenv import load_dotenv
 
 async def main():
+    load_dotenv()
     parser = argparse.ArgumentParser()
     parser.add_argument("--query", required=True)
     args = parser.parse_args()

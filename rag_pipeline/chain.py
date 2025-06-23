@@ -1,13 +1,13 @@
 from langchain_openai import ChatOpenAI
-from langchain.schema.runnable import RunnablePassthrough
+from langchain.schema.runnable import RunnablePassthrough, RunnableMap
 from langchain.schema.output_parser import StrOutputParser
 from langchain.prompts import PromptTemplate
 from langchain_core.vectorstores import VectorStoreRetriever
+from typing import Dict, Any
 
 class RentLawQAChain:
     """
-    Builds a Retrieval-Augmented Generation (RAG) chain to answer questions about
-    Dutch rental law using an LLM and a vector store retriever.
+    Builds a RAG chain that returns both the answer and its source documents.
     """
 
     def __init__(
@@ -17,34 +17,45 @@ class RentLawQAChain:
         model_name: str = "gpt-4o",
         temperature: float = 0.0
     ):
-        """
-        Initialize the QA chain.
-
-        Args:
-            retriever (VectorStoreRetriever): Retriever to fetch relevant context.
-            prompt_template (PromptTemplate): Prompt structure used to guide the LLM.
-            model_name (str): OpenAI model name (e.g. 'gpt-4o').
-            temperature (float): Sampling temperature for creativity (0 = deterministic).
-        """
         self.retriever = retriever
         self.prompt = prompt_template
         self.llm = ChatOpenAI(model_name=model_name, temperature=temperature)
 
         self.chain = (
-            {"context": self.retriever, "question": RunnablePassthrough()}
+            RunnableMap({
+                "context": self.retriever,
+                "question": lambda x: x  # passthrough
+            })
             | self.prompt
             | self.llm
             | StrOutputParser()
         )
 
-    def ask(self, query: str) -> str:
-        """
-        Run a question through the RAG chain and return the generated answer.
+    def _prepare_input(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Construct context string from retrieved docs and keep metadata."""
+        docs = inputs["docs"]
+        context = "\n\n".join([doc.page_content for doc in docs])
+        return {
+            "context": context,
+            "question": inputs["question"],
+            "docs": docs
+        }
 
-        Args:
-            query (str): A natural language question about Dutch rental law.
+    def _format_output(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Format final output with answer + sources."""
+        answer = inputs["text"]  # output from the LLM
+        docs = inputs.get("docs", [])
 
-        Returns:
-            str: The LLM-generated answer based on retrieved context.
-        """
+        sources = [
+            {
+                "document": doc.metadata.get("source", "Unknown"),
+                "snippet": doc.page_content[:200].strip()
+            }
+            for doc in docs
+        ]
+
+        return {"answer": answer.strip(), "sources": sources}
+
+    def ask(self, query: str) -> dict:
+        """Returns both answer and sources."""
         return self.chain.invoke(query)
