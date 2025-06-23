@@ -5,7 +5,8 @@ from rag_pipeline.prompts import get_rent_law_prompt
 from rag_pipeline.embedder import Embedder
 from rag_pipeline.vectordb import VectorDB
 from rag_pipeline.chain import RentLawQAChain
-
+from dotenv import load_dotenv
+load_dotenv()
 # Globals to hold RAG components
 vector_store = None
 rag_chain = None
@@ -31,6 +32,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 @app.get("/query")
-async def query(text: str = Query(..., description="The user's question")):
+async def query(text: str = Query(..., description="Your question regarding Dutch Affordable Rent Act")):
     answer = rag_chain.ask(text)
     return {"answer": answer}
